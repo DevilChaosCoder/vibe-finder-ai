@@ -10,6 +10,7 @@ try:
     scaler = joblib.load('scaler.joblib')
     df = pd.read_pickle('processed_data.pkl')
     # Combine song name and artist for the search box
+    # This line is CORRECT because it operates on the entire pandas Series
     df['song_artist'] = df['name'] + " by " + df['artists'].str.replace(r"[\[\]']", "", regex=True)
 except FileNotFoundError:
     st.error("The model's artifacts are missing from the ether. Please run model_training.py to conjure them.")
@@ -117,7 +118,9 @@ with tab1:
             st.subheader(f"Spirits that resonate with '{selected_song}':")
             for i in range(1, len(indices[0])):
                 recommended_song = df.iloc[indices[0][i]]
-                st.write(f"**{i}. {recommended_song['name']}** by {recommended_song['artists'].replace(r'[\[\]\']', '', regex=True)}")
+                # FIXED LINE: Use .strip() for individual strings to remove brackets
+                cleaned_artists = recommended_song['artists'].strip("[]'")
+                st.write(f"**{i}. {recommended_song['name']}** by {cleaned_artists}")
         else:
             st.warning("You must select a melody first.")
 
@@ -135,7 +138,9 @@ with tab2:
     cols = st.columns(3)
     for i, song in enumerate(st.session_state.song_pool.itertuples()):
         with cols[i % 3]:
-            if st.button(f"{song.name} by {song.artists.replace(r'[\[\]\']', '', regex=True)}", key=song.id):
+            # FIXED LINE: Use .strip() for individual strings to remove brackets
+            cleaned_artists = song.artists.strip("[]'")
+            if st.button(f"{song.name} by {cleaned_artists}", key=song.id):
                 if song.id not in [s['id'] for s in st.session_state.chosen_songs]:
                     st.session_state.chosen_songs.append({'name': song.name, 'artists': song.artists, 'id': song.id})
                     st.toast(f"'{song.name}' has been added to the summoning circle.")
@@ -167,9 +172,10 @@ with tab2:
                     rec_song_id = df.iloc[indices[0][i]]['id']
                     if rec_song_id not in chosen_ids:
                         rec_song_info = df.iloc[indices[0][i]]
-                        st.write(f"**{rec_count+1}. {rec_song_info['name']}** by {rec_song_info['artists'].replace(r'[\[\]\']', '', regex=True)}")
+                        # FIXED LINE: Use .strip() for individual strings to remove brackets
+                        cleaned_artists = rec_song_info['artists'].strip("[]'")
+                        st.write(f"**{rec_count+1}. {rec_song_info['name']}** by {cleaned_artists}")
                         rec_count += 1
-
 
     # Display chosen songs in a sidebar
     with st.sidebar:
