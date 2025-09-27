@@ -10,10 +10,10 @@ try:
     scaler = joblib.load('scaler.joblib')
     df = pd.read_pickle('processed_data.pkl')
     # Combine song name and artist for the search box
-    # This line is CORRECT because it operates on the entire pandas Series
-    df['song_artist'] = df['name'] + " by " + df['artists'].str.replace(r"[\[\]']", "", regex=True)
+    # This works because the 'artists' column is now pre-cleaned
+    df['song_artist'] = df['name'] + " by " + df['artists']
 except FileNotFoundError:
-    st.error("The model's artifacts are missing from the ether. Please run model_training.py to conjure them.")
+    st.error("The model's artifacts are missing from the ether. Please run the Colab notebook to conjure them.")
     st.stop()
 
 # --- 2. Conjure the Gothic UI ---
@@ -55,13 +55,12 @@ h1, h2, h3 {
     outline: none;
 }
 
-/* Style for primary button in Vibe Builder */
-.stButton[data-testid="stFormSubmitButton"]>button, .stButton[aria-label="Generate My Vibe Playlist! ✨"]>button {
+.stButton[aria-label="Summon My Vibe Playlist! 🔮"]>button {
     background-color: #9a4ca6;
     color: #ffffff;
     border: 2px solid #9a4ca6;
 }
-.stButton[data-testid="stFormSubmitButton"]>button:hover, .stButton[aria-label="Generate My Vibe Playlist! ✨"]>button:hover {
+.stButton[aria-label="Summon My Vibe Playlist! 🔮"]>button:hover {
      background-color: #5c2c69;
      border: 2px solid #c789d6;
 }
@@ -107,20 +106,20 @@ with tab1:
 
     if st.button("Unveil Similar Melodies 🕯️", key='song_matcher'):
         if selected_song:
-            # Find song's essence
-            song_index = df[df['song_artist'] == selected_song].index[0]
-            song_features = df.iloc[song_index][['acousticness', 'danceability', 'energy', 'instrumentalness', 'liveness', 'loudness', 'speechiness', 'tempo', 'valence']].values.reshape(1, -1)
-            
-            # Scale features and find its kin
-            scaled_features = scaler.transform(song_features)
-            distances, indices = knn_model.kneighbors(scaled_features)
-            
-            st.subheader(f"Spirits that resonate with '{selected_song}':")
-            for i in range(1, len(indices[0])):
-                recommended_song = df.iloc[indices[0][i]]
-                # FIXED LINE: Use .strip() for individual strings to remove brackets
-                cleaned_artists = recommended_song['artists'].strip("[]'")
-                st.write(f"**{i}. {recommended_song['name']}** by {cleaned_artists}")
+            song_index_query = df[df['song_artist'] == selected_song]
+            if not song_index_query.empty:
+                song_index = song_index_query.index[0]
+                song_features = df.loc[song_index, ['acousticness', 'danceability', 'energy', 'instrumentalness', 'liveness', 'loudness', 'speechiness', 'tempo', 'valence']].values.reshape(1, -1)
+                
+                scaled_features = scaler.transform(song_features)
+                distances, indices = knn_model.kneighbors(scaled_features)
+                
+                st.subheader(f"Spirits that resonate with '{selected_song}':")
+                for i in range(1, len(indices[0])):
+                    recommended_song = df.iloc[indices[0][i]]
+                    st.write(f"**{i}. {recommended_song['name']}** by {recommended_song['artists']}")
+            else:
+                st.error("A shadow has fallen upon this query. The song was not found.")
         else:
             st.warning("You must select a melody first.")
 
@@ -129,18 +128,14 @@ with tab2:
     st.header("Weave a Playlist from Sheer Mood")
     st.markdown("Choose the fragments of sound that please you. We shall find others that share their soul.")
 
-    # Initialize session state for chosen fragments
     if 'chosen_songs' not in st.session_state:
         st.session_state.chosen_songs = []
         st.session_state.song_pool = df.sample(9)
 
-    # Display song tiles for selection
     cols = st.columns(3)
     for i, song in enumerate(st.session_state.song_pool.itertuples()):
         with cols[i % 3]:
-            # FIXED LINE: Use .strip() for individual strings to remove brackets
-            cleaned_artists = song.artists.strip("[]'")
-            if st.button(f"{song.name} by {cleaned_artists}", key=song.id):
+            if st.button(f"{song.name} by {song.artists}", key=song.id):
                 if song.id not in [s['id'] for s in st.session_state.chosen_songs]:
                     st.session_state.chosen_songs.append({'name': song.name, 'artists': song.artists, 'id': song.id})
                     st.toast(f"'{song.name}' has been added to the summoning circle.")
@@ -172,12 +167,9 @@ with tab2:
                     rec_song_id = df.iloc[indices[0][i]]['id']
                     if rec_song_id not in chosen_ids:
                         rec_song_info = df.iloc[indices[0][i]]
-                        # FIXED LINE: Use .strip() for individual strings to remove brackets
-                        cleaned_artists = rec_song_info['artists'].strip("[]'")
-                        st.write(f"**{rec_count+1}. {rec_song_info['name']}** by {cleaned_artists}")
+                        st.write(f"**{rec_count+1}. {rec_song_info['name']}** by {rec_song_info['artists']}")
                         rec_count += 1
 
-    # Display chosen songs in a sidebar
     with st.sidebar:
         st.header("The Summoning Circle")
         if st.session_state.chosen_songs:
